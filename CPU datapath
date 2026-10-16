@@ -1,0 +1,314 @@
+module cpu_datapath(
+  input clk, rst, en,
+  output [3:0] result
+);
+
+  // IF Stage Signals
+  wire [7:0]  pc_IF;
+  wire [7:0]  nxt_pc_IF;
+  wire [18:0] instruction_IF;
+
+  // ID Stage Signals
+  wire [18:0] instruction_ID;
+  wire [2:0]  sel_ID;
+  wire [1:0]  select_A_ID;
+  wire [1:0]  select_B_ID;
+  wire [1:0]  write_select_ID;
+  wire [3:0]  immediate_ID;
+  wire        mem_write_ID;
+  wire        mem_read_ID;
+  wire        mem_to_reg_ID;
+  wire        write_enable_ID;
+  wire        alu_src_ID;
+  wire        branch_ID;
+  wire        halt_ID;
+  wire [3:0]  data_A_ID;
+  wire [3:0]  data_B_ID;
+  wire [3:0]  write_data_ID;
+
+  // ID Stage Stalling MUX Signals
+  wire [2:0]  sel_stall_ID;
+  wire [1:0]  select_A_stall_ID;
+  wire [1:0]  select_B_stall_ID;
+  wire [1:0]  write_select_stall_ID;
+  wire [3:0]  immediate_stall_ID;
+  wire        mem_write_stall_ID;
+  wire        mem_read_stall_ID;
+  wire        mem_to_reg_stall_ID;
+  wire        write_enable_stall_ID;
+  wire        alu_src_stall_ID;
+  wire        branch_stall_ID;
+  wire        halt_stall_ID;
+
+  // EX Stage Signals
+  wire [1:0]  select_A_EX;
+  wire [1:0]  select_B_EX;
+  wire [2:0]  sel_EX;
+  wire [1:0]  write_select_EX;
+  wire [3:0]  immediate_EX;
+  wire        mem_write_EX;
+  wire        mem_read_EX;
+  wire        mem_to_reg_EX;
+  wire        write_enable_EX;
+  wire        alu_src_EX;
+  wire        branch_EX;
+  wire        halt_EX;
+  wire [3:0]  write_data_EX;
+  wire [3:0]  data_A_EX;
+  wire [3:0]  data_B_EX;
+  wire [3:0]  result_EX;
+  wire        zero_flag_EX;
+  wire        sign_flag_EX;
+  wire        carry_flag_EX;
+  wire        branch_taken_EX;
+  wire [7:0]  branch_target_EX;
+  wire [3:0]  alu_input_B_EX;
+  reg  [3:0]  forwarded_A_EX;
+  reg  [3:0]  forwarded_B_EX;
+
+  // MEM Stage Signals
+  wire        mem_write_MEM;
+  wire        mem_read_MEM;
+  wire        write_enable_MEM;
+  wire        mem_to_reg_MEM;
+  wire [3:0]  data_B_MEM;
+  wire [3:0]  write_data_MEM;
+  wire [3:0]  result_MEM;
+  wire [1:0]  write_select_MEM;
+  wire [3:0]  read_data_MEM;
+
+  // WB Stage Signals
+  wire        write_enable_WB;
+  wire        mem_to_reg_WB;
+  wire [3:0]  write_data_WB;
+  wire [3:0]  read_data_WB;
+  wire [3:0]  result_WB;
+  wire [1:0]  write_select_WB;
+  wire [3:0]  WB_data;
+
+  // Hazard / Control Signals
+  wire [1:0]  forward_A;
+  wire [1:0]  forward_B;
+  wire        stall;
+  wire        flush;
+
+  // ==========================================================================
+  // 1) IF Stage
+  // ==========================================================================
+  program_counter pc1 (
+    .clk(clk),
+    .rst(rst),
+    .en(~stall),
+    .nxt_pc_IF(nxt_pc_IF),
+    .pc_IF(pc_IF)
+  );
+
+  instruction_memory imem (
+    .pc_IF(pc_IF),
+    .instruction_IF(instruction_IF)
+  );
+
+  IF_ID_reg IF_ID (
+    .clk(clk),
+    .rst(rst),
+    .en(~stall),
+    .flush(flush),
+    .instruction_IF(instruction_IF),
+    .instruction_ID(instruction_ID)
+  );
+
+  // ==========================================================================
+  // 2) Decode (ID) Stage
+  // ==========================================================================
+  control_unit cu (
+    .instruction_ID(instruction_ID),
+    .sel_ID(sel_ID),
+    .select_A_ID(select_A_ID),
+    .select_B_ID(select_B_ID),
+    .write_select_ID(write_select_ID),
+    .immediate_ID(immediate_ID),
+    .mem_write_ID(mem_write_ID),
+    .mem_read_ID(mem_read_ID),
+    .mem_to_reg_ID(mem_to_reg_ID),
+    .write_enable_ID(write_enable_ID),
+    .alu_src_ID(alu_src_ID),
+    .branch_ID(branch_ID),
+    .halt_ID(halt_ID)
+  );
+
+  reg_file rf (
+    .clk(clk),
+    .rst(rst),
+    .write_enable_WB(write_enable_WB),
+    .select_A_ID(select_A_ID),
+    .select_B_ID(select_B_ID),
+    .write_select_WB(write_select_WB),
+    .WB_data(WB_data),
+    .data_A_ID(data_A_ID),
+    .data_B_ID(data_B_ID)
+  );
+
+  stalling_unit su (
+    .mem_read_EX(mem_read_EX),
+    .select_A_ID(select_A_ID),
+    .select_B_ID(select_B_ID),
+    .write_select_EX(write_select_EX),
+    .stall(stall)
+  );
+
+  assign write_data_ID = data_B_ID;
+
+  assign sel_stall_ID          = stall ? 3'b000 : sel_ID;
+  assign select_A_stall_ID     = stall ? 2'b00  : select_A_ID;
+  assign select_B_stall_ID     = stall ? 2'b00  : select_B_ID;
+  assign write_select_stall_ID = stall ? 2'b00  : write_select_ID;
+  assign immediate_stall_ID    = stall ? 4'b0000: immediate_ID;
+  assign mem_write_stall_ID    = stall ? 1'b0   : mem_write_ID;
+  assign mem_read_stall_ID     = stall ? 1'b0   : mem_read_ID;
+  assign mem_to_reg_stall_ID   = stall ? 1'b0   : mem_to_reg_ID;
+  assign write_enable_stall_ID = stall ? 1'b0   : write_enable_ID;
+  assign alu_src_stall_ID      = stall ? 1'b0   : alu_src_ID;
+  assign branch_stall_ID       = stall ? 1'b0   : branch_ID;
+  assign halt_stall_ID         = stall ? 1'b0   : halt_ID;
+
+  ID_EX_reg ID_EX (
+    .clk(clk),
+    .rst(rst),
+    .flush(flush),
+    .select_A_in(select_A_stall_ID),
+    .select_B_in(select_B_stall_ID),
+    .sel_in(sel_stall_ID),
+    .write_select_in(write_select_stall_ID),
+    .immediate_in(immediate_stall_ID),
+    .mem_write_in(mem_write_stall_ID),
+    .mem_read_in(mem_read_stall_ID),
+    .mem_to_reg_in(mem_to_reg_stall_ID),
+    .write_enable_in(write_enable_stall_ID),
+    .alu_src_in(alu_src_stall_ID),
+    .branch_in(branch_stall_ID),
+    .halt_in(halt_stall_ID),
+    .write_data_in(write_data_ID),
+    .data_A_in(data_A_ID),
+    .data_B_in(data_B_ID),
+
+    .select_A_out(select_A_EX),
+    .select_B_out(select_B_EX),
+    .sel_out(sel_EX),
+    .write_select_out(write_select_EX),
+    .immediate_out(immediate_EX),
+    .mem_write_out(mem_write_EX),
+    .mem_read_out(mem_read_EX),
+    .mem_to_reg_out(mem_to_reg_EX),
+    .write_enable_out(write_enable_EX),
+    .alu_src_out(alu_src_EX),
+    .branch_out(branch_EX),
+    .halt_out(halt_EX),
+    .write_data_out(write_data_EX),
+    .data_A_out(data_A_EX),
+    .data_B_out(data_B_EX)
+  );
+
+  // ==========================================================================
+  // 3) Execute (EX) Stage
+  // ==========================================================================
+  forwarding_unit fu (
+    .select_A_EX(select_A_EX),
+    .select_B_EX(select_B_EX),
+    .write_select_MEM(write_select_MEM),
+    .write_select_WB(write_select_WB),
+    .write_enable_MEM(write_enable_MEM),
+    .write_enable_WB(write_enable_WB),
+    .forward_A(forward_A),
+    .forward_B(forward_B)
+  );
+
+  always @(*) begin
+    case (forward_A)
+      2'b00:   forwarded_A_EX = data_A_EX;
+      2'b10:   forwarded_A_EX = result_MEM;
+      2'b01:   forwarded_A_EX = WB_data;
+      default: forwarded_A_EX = data_A_EX;
+    endcase
+
+    case (forward_B)
+      2'b00:   forwarded_B_EX = data_B_EX;
+      2'b10:   forwarded_B_EX = result_MEM;
+      2'b01:   forwarded_B_EX = WB_data;
+      default: forwarded_B_EX = data_B_EX;
+    endcase
+  end
+
+  assign alu_input_B_EX = (alu_src_EX) ? immediate_EX : forwarded_B_EX;
+
+  alu_datapath alu1 (
+    .data_A(forwarded_A_EX),
+    .data_B(alu_input_B_EX),
+    .sel(sel_EX),
+    .result(result_EX),
+    .zero_flag(zero_flag_EX),
+    .carry_flag(carry_flag_EX),
+    .sign_flag(sign_flag_EX)
+  );
+ 
+​
+  assign branch_taken_EX  = branch_EX & zero_flag_EX;
+  assign branch_target_EX = (pc_IF)+immediate_EX;
+  assign flush            = branch_taken_EX;
+​
+  assign nxt_pc_IF = halt_EX ? pc_IF :branch_taken_EX ?branch_target_EX:(pc_IF + 1);
+​
+  EX_mem_reg EX_mem (
+    .clk(clk),
+    .rst(rst),
+    .mem_write_in(mem_write_EX),
+    .mem_read_in(mem_read_EX),
+    .data_B_in(forwarded_B_EX),
+    .write_data_in(write_data_EX),
+    .result_in(result_EX),
+    .write_select_in(write_select_EX),
+    .write_enable_in(write_enable_EX),
+    .mem_to_reg_in(mem_to_reg_EX),
+​
+    .mem_write_out(mem_write_MEM),
+    .data_B_out(data_B_MEM),
+    .write_data_out(write_data_MEM),
+    .result_out(result_MEM),
+    .write_select_out(write_select_MEM),
+    .mem_read_out(mem_read_MEM),
+    .write_enable_out(write_enable_MEM),
+    .mem_to_reg_out(mem_to_reg_MEM)
+  );
+data_memory dmem (
+    .clk(clk),
+    .write_data(data_B_MEM),
+    .mem_write(mem_write_MEM),
+    .mem_read(mem_read_MEM),
+    .address(result_MEM),
+    .read_data(read_data_MEM)
+  );
+
+  mem_WB_reg mem_WB (
+    .clk(clk),
+    .rst(rst),
+    .write_data_in(write_data_MEM),
+    .write_enable_in(write_enable_MEM),
+    .mem_to_reg_in(mem_to_reg_MEM),
+    .read_data_in(read_data_MEM),
+    .result_in(result_MEM),
+    .write_select_in(write_select_MEM),
+
+    .write_data_out(write_data_WB),
+    .mem_to_reg_out(mem_to_reg_WB),
+    .read_data_out(read_data_WB),
+    .result_out(result_WB),
+    .write_select_out(write_select_WB),
+    .write_enable_out(write_enable_WB)
+  );
+
+  // ==========================================================================
+  // 5) Write Back (WB) Stage
+  // ==========================================================================
+  assign WB_data = (mem_to_reg_WB) ? read_data_WB : result_WB;
+  assign result  = WB_data;
+
+endmodule
