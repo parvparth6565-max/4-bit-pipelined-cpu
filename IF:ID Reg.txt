@@ -1,0 +1,15 @@
+module IF_ID_reg(
+  input clk, rst, en, flush,
+  input [18:0] instruction_IF,
+  output reg [18:0] instruction_ID
+);
+  always @(posedge clk or posedge rst) begin
+    if (rst) begin
+      instruction_ID <= 19'b0;
+    end else if (flush) begin
+      instruction_ID <= 19'b0;
+    end else if (en) begin
+      instruction_ID <= instruction_IF;
+    end
+  end
+endmodule

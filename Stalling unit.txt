@@ -1,0 +1,14 @@
+module stalling_unit(
+  input mem_read_EX,
+  input [1:0] select_A_ID,
+  input [1:0] select_B_ID,
+  input [1:0] write_select_EX,
+  output reg stall
+);
+  always @(*) begin
+    if (mem_read_EX && ((write_select_EX == select_A_ID) || (write_select_EX == select_B_ID)))
+      stall = 1'b1;
+    else
+      stall = 1'b0;
+  end
+endmodule

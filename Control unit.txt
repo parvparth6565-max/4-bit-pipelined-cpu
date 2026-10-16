@@ -1,0 +1,28 @@
+module control_unit(
+  input [18:0] instruction_ID,
+  output [2:0] sel_ID,
+  output [1:0] select_A_ID,
+  output [1:0] select_B_ID,
+  output [1:0] write_select_ID,
+  output [3:0] immediate_ID,
+  output mem_write_ID,
+  output mem_read_ID,
+  output mem_to_reg_ID,
+  output write_enable_ID,
+  output alu_src_ID,
+  output branch_ID,
+  output halt_ID
+);
+  assign immediate_ID    = instruction_ID[18:15];
+  assign sel_ID          = instruction_ID[14:12];
+  assign select_A_ID     = instruction_ID[11:10];
+  assign select_B_ID     = instruction_ID[9:8];
+  assign write_select_ID = instruction_ID[7:6];
+  assign mem_write_ID    = instruction_ID[5];
+  assign mem_read_ID     = instruction_ID[4];
+  assign mem_to_reg_ID   = instruction_ID[3];
+  assign write_enable_ID = instruction_ID[2];
+  assign alu_src_ID      = instruction_ID[1];
+  assign halt_ID         = (instruction_ID == 19'b1111111111111111111);
+  assign branch_ID       = instruction_ID[0] && !halt_ID;
+endmodule 

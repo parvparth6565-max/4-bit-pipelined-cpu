@@ -1,0 +1,26 @@
+module reg_file(
+  input clk, rst,
+  input write_enable_WB,
+  input [1:0] select_A_ID,
+  input [1:0] select_B_ID,
+  input [1:0] write_select_WB,
+  input [3:0] WB_data,
+  output [3:0] data_A_ID,
+  output [3:0] data_B_ID
+);
+  reg [3:0] r[0:3];
+
+  assign data_A_ID = r[select_A_ID];
+  assign data_B_ID = r[select_B_ID];
+
+  always @(posedge clk or posedge rst) begin
+    if (rst) begin
+      r[0] <= 4'b0000;
+      r[1] <= 4'b0011;
+      r[2] <= 4'b0101;
+      r[3] <= 4'b1000;
+    end else if (write_enable_WB) begin
+      r[write_select_WB] <= WB_data;
+    end
+  end
+endmodule

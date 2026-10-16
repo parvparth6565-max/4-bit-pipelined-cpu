@@ -1,0 +1,12 @@
+module program_counter(
+  input clk, rst, en,
+  input [7:0] nxt_pc_IF,
+  output reg [7:0] pc_IF
+);
+  always @(posedge clk or posedge rst) begin
+    if (rst)
+      pc_IF <= 8'b00000000;
+    else if (en)
+      pc_IF <= nxt_pc_IF;
+  end
+endmodule
